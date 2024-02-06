@@ -4,15 +4,10 @@ import fs from 'fs-extra'
 import JoyCon from 'joycon'
 import isBinaryPath from 'is-binary-path'
 import createDebug from 'debug'
-import { parse } from '@vue/compiler-sfc'
+import { parse, SFCStyleBlock } from '@vue/compiler-sfc'
 import glob from 'fast-glob'
 import cloneDeep from 'lodash.clonedeep'
-import {
-  replaceContants,
-  cssExtensionsRe,
-  jsExtensionsRe,
-  isDefined,
-} from './utils'
+import { cssExtensionsRe, isDefined, jsExtensionsRe, replaceContants, } from './utils'
 import { compileScript } from './compileScript'
 import { compileStyles } from './compileStyles'
 import { compileTemplate } from './compileTemplate'
@@ -31,7 +26,9 @@ interface InputOptions {
   include?: string[]
   exclude?: string[]
   debug?: boolean
-  preserveTsBlock?: boolean
+  preserveTsBlock?: boolean;
+  preserveStyleBlock?: boolean;
+  preserveTemplateBlock?: boolean;
 }
 
 interface NormalizedOptions {
@@ -42,7 +39,9 @@ interface NormalizedOptions {
   include?: string[]
   exclude?: string[]
   debug?: boolean
-  preserveTsBlock?: boolean
+  preserveTsBlock?: boolean;
+  preserveStyleBlock?: boolean;
+  preserveTemplateBlock?: boolean;
 }
 
 class VueCompile extends EventEmitter {
@@ -120,6 +119,8 @@ class VueCompile extends EventEmitter {
       outFile,
       babelrc: this.options.babelrc,
       transformTypeScript: true,
+      transformStyle: true,
+      transformTemplate: true,
     }
 
     if (!input.endsWith('.vue')) {
@@ -127,20 +128,25 @@ class VueCompile extends EventEmitter {
     }
 
     ctx.transformTypeScript = !this.options.preserveTsBlock
+    ctx.transformStyle = !this.options.preserveStyleBlock
+    ctx.transformTemplate = !this.options.preserveTemplateBlock
 
     const sfc = cloneDeep(
       parse(source, {
         filename: input,
+        ignoreEmpty: false,
       }),
-    )
+    );
 
     const script = await compileScript(sfc.descriptor.script, ctx)
     const scriptSetup = await compileScript(sfc.descriptor.scriptSetup, ctx)
-    const template = compileTemplate(sfc.descriptor.template)
-    const styles = await compileStyles(sfc.descriptor.styles, ctx)
+
+    const template = ctx.transformTemplate ? compileTemplate(sfc.descriptor.template) : null;
+    const styles: SFCStyleBlock[] = ctx.transformStyle ? await compileStyles(sfc.descriptor.styles, ctx) : [];
 
     await writeSFC(
       {
+        descriptor: sfc.descriptor,
         scripts: [script, scriptSetup].filter(isDefined).sort((a, b) => {
           return a.loc.start > b.loc.start ? -1 : 1
         }),
@@ -148,6 +154,8 @@ class VueCompile extends EventEmitter {
         template,
         customBlocks: sfc.descriptor.customBlocks,
         preserveTsBlock: this.options.preserveTsBlock,
+        preserveStyleBlock: this.options.preserveStyleBlock,
+        preserveTemplateBlock: this.options.preserveTemplateBlock,
       },
       outFile,
     )

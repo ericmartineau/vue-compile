@@ -17,9 +17,12 @@ export const compileScript = async (
     script.lang === 'ts' ||
     script.lang === 'typescript'
   ) {
-    script.content = await import(
+    await import(
       './script-compilers/babel'
-    ).then(async ({ compile }) => compile(code, ctx))
+      ).then(async ({ compile }) => {
+      script.content = await compile(code, ctx);
+    })
+
   } else {
     throw new Error(notSupportedLang(script.lang, 'script'))
   }

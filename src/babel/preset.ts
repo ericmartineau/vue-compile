@@ -18,9 +18,12 @@ export default (_: any, opts: { transformTypeScript: boolean }) => {
     },
   ])
 
-  const plugins = [replaceExtensionInImports]
+  const plugins: unknown[] = [
+    replaceExtensionInImports
+  ]
   if (!opts.transformTypeScript) {
-    plugins.push(require('@babel/plugin-syntax-typescript'))
+    // plugins.push(require('@babel/plugin-syntax-typescript'));
+
   }
 
   return {
@@ -49,7 +52,17 @@ function replaceExtensionInImports(opts: { types: typeof Types }): PluginObj {
             const res = arg.evaluate()
             if (res.confident && cssExtensionsRe.test(res.value)) {
               path.node.arguments = [
-                t.stringLiteral(res.value.replace(cssExtensionsRe, '.css')),
+                {
+                  ...t.stringLiteral(res.value.replace(cssExtensionsRe, '.css')),
+                  leadingComments: null,
+                  innerComments: null,
+                  trailingComments: null,
+                  start: null,
+                  end: null,
+                  loc:null,
+
+                }
+
               ]
             }
           }
